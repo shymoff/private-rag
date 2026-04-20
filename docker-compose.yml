@@ -13,10 +13,8 @@ services:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
-      # Baza wektorowa — żeby nie rebuildować obrazu po każdym ingeście
-      - ./chroma_db:/app/chroma_db
-      - ./data:/app/data
-      # Cache HuggingFace — żeby embeddingi nie pobierały się przy każdym starcie
+      # Cache HuggingFace — żeby embeddingi nie pobierały się przy każdym starcie.
+      # Baza wektorowa jest in-memory per sesja, więc nic więcej nie montujemy.
       - hf_cache:/root/.cache/huggingface
     depends_on:
       - ollama
