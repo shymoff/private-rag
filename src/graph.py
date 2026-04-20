@@ -1,3 +1,5 @@
+import os
+
 from langchain_community.chat_models import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_chroma import Chroma
@@ -9,8 +11,9 @@ from src.state import AgentState
 DB_PATH = "chroma_db/"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 RETRIEVAL_K = 3
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
-llm = ChatOllama(model="llama3:8b", temperature=0)
+llm = ChatOllama(model="llama3:8b", temperature=0, base_url=OLLAMA_BASE_URL)
 embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
 vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
 retriever = vector_db.as_retriever(search_kwargs={"k": RETRIEVAL_K})
