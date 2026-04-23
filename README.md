@@ -1,43 +1,43 @@
 # Private RAG
 
-Lokalny chat z własnymi PDF-ami — w 100% offline. Wgrywasz dokumenty przez UI, zadajesz pytania, model odpowiada wyłącznie na podstawie ich zawartości. Nic nie wychodzi poza Twój komputer.
+Chat with your own PDFs — 100% offline. Upload documents through the UI, ask questions, and the model answers strictly based on their contents. Nothing leaves your machine.
 
-## Jak to działa
+## How it works
 
 ```
-PDF → chunking → embeddingi (HuggingFace) → Chroma (in-memory per sesja)
+PDF → chunking → embeddings (HuggingFace) → Chroma (in-memory, per session)
                                                        ↓
-                     pytanie → retrieval → grader (LLM) → generate (LLM) → odpowiedź
+                    question → retrieval → grader (LLM) → generate (LLM) → answer
 ```
 
-- **Embeddingi**: `sentence-transformers/all-MiniLM-L6-v2` (lokalnie przez HuggingFace)
-- **LLM**: `llama3:8b` przez [Ollama](https://ollama.com/) (lokalnie)
-- **Vector store**: ChromaDB, in-memory, per sesja przeglądarki
-- **Orkiestracja**: LangGraph — retrieve → grade → generate, z warunkową krawędzią która zatrzymuje generację jeśli grader uzna dokumenty za nieistotne (brak halucynacji)
-- **UI**: Streamlit z uploadem plików bezpośrednio w inpucie czatu
+- **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2` (local, via HuggingFace)
+- **LLM**: `llama3:8b` via [Ollama](https://ollama.com/) (local)
+- **Vector store**: ChromaDB, in-memory, per browser session
+- **Orchestration**: LangGraph — retrieve → grade → generate, with a conditional edge that skips generation if the grader marks the documents as irrelevant (no hallucinations)
+- **UI**: Streamlit with file upload directly in the chat input
 
-## Uruchomienie (Docker)
+## Running with Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-Pierwsza konfiguracja — pull modelu (jednorazowo):
+First-time setup — pull the model (one-off):
 ```bash
 docker compose exec ollama ollama pull llama3:8b
 ```
 
-UI pod `http://localhost:8501`.
+UI at `http://localhost:8501`.
 
-## Uruchomienie lokalne (bez Dockera)
+## Running locally (without Docker)
 
-Wymaga Pythona 3.13.2 i [uv](https://docs.astral.sh/uv/).
+Requires Python 3.13.2 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# 1. Zależności
+# 1. Dependencies
 uv sync
 
-# 2. Ollama — w osobnym terminalu
+# 2. Ollama — in a separate terminal
 ollama serve
 ollama pull llama3:8b
 
@@ -45,47 +45,47 @@ ollama pull llama3:8b
 uv run streamlit run app.py
 ```
 
-## Użycie
+## Usage
 
-1. Otwórz `http://localhost:8501`
-2. Kliknij **+** przy polu czatu i wybierz PDF (możesz wgrać kilka naraz)
-3. Poczekaj aż pojawi się "📎 Dodano **plik.pdf** — N fragmentów"
-4. Zadaj pytanie
+1. Open `http://localhost:8501`
+2. Click **+** next to the chat input and pick a PDF (multiple files allowed)
+3. Wait for the confirmation: "📎 Added **file.pdf** — N chunks"
+4. Ask a question
 
-Jeśli grader uzna że dokumenty nie mają nic wspólnego z pytaniem, zobaczysz _"Nie znalazłem odpowiedzi w dokumentach."_ — to znaczy że RAG działa prawidłowo i model nie zmyśla.
+If the grader decides the documents have nothing to do with the question, you'll see _"Nie znalazłem odpowiedzi w dokumentach."_ — this means RAG is working correctly and the model is not making things up.
 
-## Izolacja per sesja
+## Per-session isolation
 
-Każda zakładka przeglądarki ma **własną, odrębną bazę wektorową** w pamięci. Oznacza to:
+Every browser tab has its **own, isolated vector store** in memory. This means:
 
-- Dokumenty wgrane w zakładce A nie są widoczne w zakładce B
-- Odświeżenie strony = czysty chat, trzeba wgrać pliki ponownie
-- Żadne dane nie trafiają na dysk ani do zewnętrznych serwisów
+- Documents uploaded in tab A are not visible in tab B
+- Refreshing the page = clean chat, files need to be re-uploaded
+- No data is written to disk or sent to any external service
 
-## Struktura projektu
+## Project structure
 
 ```
 ├── app.py                  # Streamlit UI
-├── main.py                 # alternatywny CLI do grafu (sanity check)
+├── main.py                 # alternative CLI entry point (sanity check)
 ├── Dockerfile
-├── docker-compose.yml      # app + ollama + cache HuggingFace
+├── docker-compose.yml      # app + ollama + HuggingFace cache
 ├── pyproject.toml
 └── src/
     ├── state.py            # AgentState (TypedDict)
-    ├── vector_store.py     # fabryka create_vector_db() + shared embeddingi
+    ├── vector_store.py     # create_vector_db() factory + shared embeddings
     ├── ingest.py           # ingest_pdf(path, vector_db) — loader + chunking
     ├── graph.py            # build_app(vector_db) — LangGraph workflow
-    └── inspect_db.py       # skrypt debugowy (nieużywany w nowym modelu)
+    └── inspect_db.py       # debug script (unused in the current model)
 ```
 
-## Zmienne środowiskowe
+## Environment variables
 
-| Zmienna | Default | Opis |
+| Variable | Default | Description |
 |---|---|---|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Adres API Ollamy. W compose ustawiony na `http://ollama:11434` |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API address. Set to `http://ollama:11434` in compose |
 
-## Wydajność
+## Performance
 
-- `llama3:8b` na CPU: **~30-60s na odpowiedź**
-- Na GPU NVIDIA (po dodaniu sekcji `deploy.resources.reservations.devices` do serwisu `ollama` w compose): **~2-5s**
-- Embeddingi liczą się raz przy wgraniu pliku, cache HuggingFace persystuje w wolumenie — drugie uruchomienie jest szybsze
+- `llama3:8b` on CPU: **~30-60s per answer**
+- On an NVIDIA GPU (after adding a `deploy.resources.reservations.devices` section to the `ollama` service in compose): **~2-5s**
+- Embeddings are computed once per uploaded file; the HuggingFace cache persists in a volume, so subsequent runs are faster
